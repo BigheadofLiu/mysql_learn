@@ -221,11 +221,188 @@ alter table t_emp add constraint part_for_key foreign key (part_id) references t
 alter table t_emp add constraint part_id_fk foreign key (part_id) references  t_part(id) on update cascade  on delete cascade;
 alter table t_emp drop  foreign key part_id_fk;
 alter table t_emp add constraint part_id_fk foreign key (part_id) references  t_part(id) on update cascade on delete set null ;
-# 外间约束限制
-# no action cascade set null
+
 #对于添加check的字段 无法添加外间约束
 alter table t_emp drop check t_emp_chk_2;
 delete from t_part where id=1;
 select * from t_emp;
 show create table t_emp;
 
+#多表查询
+#一对一 一对多 多对多
+#一对多 多的一方作为子表建立外键 指向少的一方的主键
+#一对一 多用于拆分表格 任意一方建立外键 指向另外一方主键（需要唯一）
+#多对多 建立一张中间表 设置两个外键约束 分别指向双方主键
+
+show create table t_student;
+drop table t_student;
+create table t_studet(
+    id int unique auto_increment,
+    t_id smallint primary key not null,
+    name varchar(10)
+);
+alter table t_student drop t_id; #报错 不可以直接删除主键
+drop table t_studet;
+create table t_student(
+    id smallint primary key auto_increment,
+    name varchar(10)
+);
+insert into t_student (name) VALUES ('张三'),('李四'),('王五'),('赵六'),('钱七');
+create table t_course(
+    id smallint primary key auto_increment,
+    name varchar(10)
+);
+insert into t_course(name) values ('语文'),('数学'),('英语'),('政治'),('历史'),('地理'),('物理'),('化学'),('生物');
+
+create table studet_course(
+    student_id smallint,
+    course_id smallint
+);
+alter table  studet_course add constraint stu_fk foreign key(student_id) references t_student(id);
+alter table studet_course add constraint cou_fk foreign key (course_id) references t_course(id);
+
+insert into studet_course (student_id,course_id) values (1,1),(1,2),(1,3),(2,1),(2,3),(2,4),(3,1),(3,2),(3,3),(3,4),(3,5),(3,6),(3,7),(3,8),(3,9);
+alter table  studet_course add id int primary key auto_increment;
+
+#一对一  多用于拆分一张表 拆分为基础信息和详情信息
+create table t_user_2
+(
+    id     int primary key auto_increment,
+    name   varchar(10),
+    gender varchar(1),
+    phone  varchar(11)
+);
+create table t_user_2_detail(
+    id int primary key auto_increment,
+    user_id int unique,
+    address varchar(100),
+    degree varchar(10),
+    major varchar(10)
+);
+insert into t_user_2 (name,gender,phone) values ('张三','男','12345678901'),('李四','女','12345678902'),('王五','男','12345678903');
+insert into t_user_2_detail (user_id,address,degree,major) values (1,'北京','本科','计算机'),(2,'上海','硕士','软件'),(3,'广州','本科','网络');
+
+alter table t_user_2_detail add constraint user_id_fk foreign key (user_id) references t_user_2(id);
+
+select * from t_emp e ,t_part p; #笛卡尔积
+select e.name,p.name from t_emp e,t_part p where e.part_id=p.id; # 隐式内连接
+select e.name,p.name from t_emp e inner join t_part p on e.part_id=p.id; #显式内连接
+select * from t_emp;
+select * from t_part;
+show create table t_part;
+show create table t_emp;
+SELECT DISTINCT part_id FROM t_emp;
+SELECT * FROM t_part;
+
+
+#外连接 左外连接 右外连接
+select e.name,p.name from t_emp e left outer join t_part p on e.part_id=p.id;
+select e.name,p.name from t_emp e right outer join t_part p on e.part_id=p.id;
+
+#内连接 我查我自己？
+select a.name '姓名',b.name '上级' from t_emp a,t_emp b where a.manager_id=b.id;
+select a.name '姓名',b.name '上级' from t_emp a left outer join t_emp b on a.manager_id=b.id;
+
+#union 将多个查询结果合并起来
+#union （all） 带all参数不会去重  select查询的字段数量和类型要相同
+select name from t_emp where age >30
+union all
+select name from t_emp where gender='男';
+
+#select嵌套
+#标量子查询
+select id from t_part where name='财务部';
+select name from t_emp where part_id=2;
+#嵌套查询
+select name from t_emp where part_id=(select t_part.id from t_part where t_part.name='财务部');
+
+select name from t_emp where age>(select age from t_emp where name='李四');
+
+#列子查询
+select name from t_emp where id in(select id from t_part where t_part.name='技术部'|| t_part.name='财务部');
+#all指全部 any（some）指任意一个
+select t_emp.name from t_emp where age >any/*(all)*/(select age from t_emp where part_id =(select id from t_part where t_part.name='财务部'));
+
+#行子查询
+select  * from t_emp where id=(select t_part.id from t_part where t_part.name='技术部');
+select t_emp.gender,t_emp.age from t_emp where name='王五' or name='文二';
+select * from t_emp where (gender,age)in (select t_emp.gender,t_emp.age from t_emp where name='王五' or name='文二');
+select * from t_emp where (gender,age)in (select t_emp.gender,t_emp.age from t_emp where name='王五' or name='文二');
+
+#表子查询
+#根据查询结果 再次查询
+select * from t_emp where age<20;
+select a.name,b.name from (select * from t_emp where age<20) a left join t_part b on a.part_id=b.id;
+
+show databases ;
+create database 多表查询练习;
+use 多表查询练习;
+create table t_emp(
+    id int primary key auto_increment,
+    name varchar(10),
+    age smallint,
+    gender varchar(1),
+    salary int,
+    part_id smallint,
+    manager_id smallint,
+    hiredate date comment '入职时间',
+    constraint part_fk foreign key (part_id) references t_part(id)
+);
+alter table t_emp modify manager_id int;
+alter table t_emp add constraint manager_fk foreign key (manager_id) references t_emp(id);
+alter table t_emp drop constraint manager_fk;
+create table t_part(
+    id smallint primary key auto_increment,
+    name varchar(10)
+);
+create table sallary_grade(
+    id smallint primary key auto_increment,
+    low int,
+    high int
+);
+insert into t_emp(name,age,gender,salary,part_id,manager_id,hiredate)
+values
+('金庸',65,'男',30000,1,null,'1980-01-01'),
+('张无忌',25,'男',10000,1,1,'1999-01-01'),
+('韦小宝',18,'男',8000,2,1,'2005-01-01'),
+('黄蓉',18,'女',9000,3,2,'2005-01-01'),
+('郭靖',35,'男',11000,2,1,'2006-01-01'),
+('黄药师',45,'男',12000,3,2,'2007-01-01'),
+('欧阳锋',65,'男',18000,4,3,'2008-01-01'),
+('梅超风',20,'女',7000,4,3,'2009-01-01'),
+('张三丰',100,'男',25000,5,3,'2010-01-01'),
+('灭绝师太',70,'女',23000,5,3,'2011-01-01'),
+('丘处机',55,'男',20000,1,1,'2012-01-01');
+insert into t_part(name) values ('总经办'),('技术部'),('销售部'),('财务部'),('人事部');
+insert into sallary_grade(low,high) values (0,3000),(3000,5000),(5000,8000),(8000,10000),(10000,15000),(15000,20000),(20000,25000),(25000,30000);
+
+#start
+select a.name,a.age,a.gender,b.name from t_emp a,t_part b where a.part_id=b.id;
+select a.name,a.age,a.gender,b.name from t_emp a,t_part b where a.part_id=b.id && a.age<30;
+select distinct a.part_id,b.name from t_emp a,t_part b where a.part_id=b.id;
+select a.*,b.name from t_emp a left outer join t_part b on a.part_id=b.id where a.age>40;
+select a.name,a.salary, b.id,b.low,b.high  from t_emp a,sallary_grade b where a.salary between b.low and b.high;
+select a.*,b.id,c.name from t_emp a,sallary_grade b,t_part c where (a.salary between b.low and b.high) and (a.part_id=c.id) and (c.name='技术部');
+select avg(a.salary)  from t_emp a where a.part_id=(select b.id from t_part b where b.name='人事部');
+#查询比灭绝工资高的员工信息
+select t_emp.salary from t_emp where name='灭绝师太';
+select * from t_emp a where  a.salary>(select salary from t_emp where name='灭绝师太');
+
+select avg(salary) from t_emp;
+select * from t_emp where salary>(select avg(salary) from t_emp);
+
+select avg(a.salary) '平均薪资',b.name '部门' from t_emp a,t_part b where a.part_id=b.id && a.part_id=1;
+select avg(a.salary) '平均薪资',b.name '部门' from t_emp a,t_part b where a.part_id=b.id && a.part_id=2;
+select avg(a.salary) '平均薪资',b.name '部门' from t_emp a,t_part b where a.part_id=b.id && a.part_id=3;
+select avg(a.salary) '平均薪资',b.name '部门' from t_emp a,t_part b where a.part_id=b.id && a.part_id=4;
+select avg(a.salary) '平均薪资',b.name '部门' from t_emp a,t_part b where a.part_id=b.id && a.part_id=5;
+
+select a1.name,a1.salary from t_emp a1 where a1.part_id=1 && a1.salary<(select avg(a.salary) from t_emp a,t_part b where a.part_id=b.id && a.part_id=1);
+select a1.name,a1.salary from t_emp a1 where a1.part_id=2 && a1.salary<(select avg(a.salary) from t_emp a,t_part b where a.part_id=b.id && a.part_id=2);
+
+select count(*) from t_emp where t_emp.part_id=1;
+#查询每个部门的人数（有点没看懂）
+select distinct a.part_id,b.name,(select count(*) from t_emp where t_emp.part_id=b.id) from t_emp a,t_part b where a.part_id=b.id;
+
+use itheima;
+select a.name,b.name from t_student a,t_course b, studet_course c where c.student_id=a.id && c.course_id=b.id;
