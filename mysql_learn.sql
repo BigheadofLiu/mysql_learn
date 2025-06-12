@@ -698,7 +698,7 @@ select * from tb_user a,(select id from tb_user limit 999990,10) b where a.id=b.
 # update 字段名(这个字段建立索引) where 字段名条件
                                                                                     
 
-
+update
 
 
 
