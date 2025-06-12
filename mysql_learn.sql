@@ -91,7 +91,7 @@ select * from t_niuma where gender='男' && t_niuma.age between 19 and 21 order 
 #                  limit                          limit
 
 show databases;
-use mysql;
+use mysql;Using where
 show tables ;
 select * from user;
 # insert into user
@@ -406,3 +406,309 @@ select distinct a.part_id,b.name,(select count(*) from t_emp where t_emp.part_id
 
 use itheima;
 select a.name,b.name from t_student a,t_course b, studet_course c where c.student_id=a.id && c.course_id=b.id;
+
+#事务
+create database 事务练习;
+use 事务练习;
+create table t_user(
+    t_id tinyint primary key auto_increment,
+    name varchar(10),
+    money int
+);
+insert into t_user (name, money) VALUES ('张三',2000),('李四',2000);
+select * from t_user;
+
+update  t_user set money=2000 where name='张三';
+update t_user set money=2000 where  name='李四';
+
+#只减1000 没有执行加1000
+update t_user set money=money-1000 where name='张三';
+
+手动模拟异常...
+
+update t_user set money=money+1000 where name='李四';
+
+#查看事务提交方式
+select @@autocommit; #默认为1 自动提交
+
+set @@autocommit=0; #修改为手动提交
+insert into t_user (name, money) VALUES ('张三',2000),('李四',2000);
+select * from t_user;
+
+update  t_user set money=2000 where name='张三';
+update t_user set money=2000 where  name='李四';
+
+#只减1000 没有执行加1000
+update t_user set money=money-1000 where name='张三';
+
+手动模拟异常...
+
+update t_user set money=money+1000 where name='李四';
+
+#手动提交
+commit ;
+
+#回滚操作
+rollback ;
+
+set @@autocommit=1;
+#开启事务
+start transaction ;
+update t_user set money=money-1000 where name='张三';
+
+手动模拟异常...
+
+update t_user set money=money+1000 where name='李四';
+
+commit; #如果没有报错 就执行commit
+
+rollback ;# 如果有报错 就执行rollback
+
+#事务隔离                  （误读、不可重复读、幻读）
+#事务级别   read uncommitted  o o o
+#          read committed    x o o
+#    repeatable read(默认）   x x 0
+#          serializable      x x x
+
+select @@transaction_isolation;
+
+show  create table 事务练习.t_user;
+show engines ;
+#数据库引擎
+create database 数据库引擎;
+use 数据库引擎;
+create table user_innodb(
+    id int primary key auto_increment,
+    name varchar(10),
+    age tinyint
+)ENGINE =innodb;
+create table user_MyISAM(
+    id int primary key auto_increment,
+    name varchar(10),
+    age tinyint
+)ENGINE =MyISAM;
+create table user_memory(
+    id int primary key auto_increment,
+    name varchar(10),
+    age tinyint
+)ENGINE =memory;
+show tables ;
+#不同的数据库引擎有不同的应用场景；
+show variables like 'innodb_file_per_table';
+show variables like 'datadir';
+
+#索引
+#1.创建索引
+create database 索引练习;
+create table t_user(
+    id int primary key auto_increment,
+    name varchar(10),
+    phone varchar(11),
+    email varchar(20),
+    major varchar(10),
+    gender varchar(1),
+    create_date date
+);
+insert into t_user(name,phone,email,major,gender,create_date)
+VALUES
+('芈月','12345678901','001@qq.com','土木工程','女','2020-01-01'),
+('程咬金','12345678902','002@qq.com','学前教育','男','2022-05-01'),
+('孙尚香','12345678903','003@qq.com','软件工程','女','2019-05-01'),
+('诸葛亮','12345678904','004@qq.com','土木工程','男','2020-01-01'),
+('妲己','12345678905','005@qq.com','学前教育','女','2022-05-01'),
+('李白','12345678906','006@qq.com','软件工程','男','2019-05-01'),
+('貂蝉','12345678907','007@qq.com','酒店管理','女','2020-01-01'),
+('孙膑','12345678908','008@qq.com','工商管理','男','2022-05-01'),
+('花木兰','12345678909','009@qq.com','土木工程','女','2019-05-01'),
+('小乔','12345678910','010@qq.com','学前教育','女','2020-01-01');
+select * from t_user;
+#创建索引
+show index from t_user;
+use 索引练习;
+create index idx_name on t_user(name);
+create unique index idx_unique_email on t_user(email);
+create index idx_name_major_gender on t_user(name,major,gender);
+create index idx_phone on t_user(phone);
+#删除索引
+drop index idx_name on t_user;
+
+#性能优化相关
+show global status like 'Com_______';  # 查看各语句执行频次
+
+#慢查询
+show  variables like 'slow_query_log'; #默认为off 需要手动修改mysql配置文件后重启
+SHOW VARIABLES LIKE 'long_query%'; #慢查询指标
+show variables like 'slow_query_log_file'#慢查询log文件
+#这里面几个坑 首先是配置文件my.cfd的位置 以及权限 以及内容格式很容易踩坑
+#需修改文件路径：etc/mysql/my.cnf
+#日志存储路径：/var/lib/mysql/localhost-slow.log
+
+#profile 分析语句耗时
+SELECT @@have_profiling;
+select @@profiling;
+set profiling =1;
+set profiling =0;
+select * from t_user;
+select * from t_user where id=2;
+select * from t_user where name='芈月';
+select count(*) from t_user;
+show profiles; # 当前终端级别
+# show profile for query 199;
+# SHOW PROFILE FOR QUERY 199; #指定参数
+SHOW PROFILE all FOR QUERY 231;
+
+#explain 查看语句的执行计划
+explain select * from t_user;
+explain select * from t_user where id=2;
+
+use itheima;
+show tables;
+select * from t_student;
+explain select * from t_student;
+explain select a.name,b.name from t_student a,t_course b,studet_course c where a.id=c.student_id && b.id=c.course_id;
+#查询选修语文的学生的所有信息
+select id from t_course where name='语文';
+select student_id from studet_course where course_id=1;
+select * from t_student where id in(1,2,3);
+explain select * from t_student where id in(select student_id from studet_course where course_id=(select id from t_course where name='语文'));
+explain select 'a';
+
+#添加索引 可以显著提升查询效率
+#索引使用法则
+#最左前缀法则
+use 索引练习;
+show tables ;
+select * from t_user;
+show index from t_user;
+explain select * from t_user where email='004@qq.com';
+explain select * from t_user a where a.name='花木兰' and a.major='土木工程' and a.gender='女'; #key_len 93
+explain select * from t_user a where a.name='花木兰' and a.major='土木工程'; /*and a.gender='女';*/ #key_len 86
+explain select * from t_user a where a.name='花木兰' /*and a.major='土木工程' and a.gender='女'*/; #key_len 43
+explain select * from t_user a where a.name='花木兰' /*and a.major='土木工程'*/ and a.gender='女'; #key_len 43 失效情况
+explain select * from t_user a where a.major='土木工程' and a.name='花木兰' and  a.gender='女'; #key_len 93 跟顺序无关
+explain select * from t_user a where /*a.name='花木兰' and*/ /*a.major='土木工程' and*/ a.gender='女'; #不生效
+#索引字段使用>或者<之后的字段索引会失效 （使用>= <=可避免）
+
+#索引失效
+#对索引字段进行运算操作 对于字符字段不加'' 后置%模糊匹配可以 %前置模糊匹配不行
+desc t_user;
+desc select * from t_user a where a.phone='12345678901'; #yes
+explain  select * from t_user a where a.phone=12345678901; #no
+create index idx_major on t_user(major);
+explain select * from t_user a where a.major like '%工程'; #模糊匹配要用like no
+explain select * from t_user a where a.major like '软件%';#yes
+
+#对于or并列的字段都需要有索引才会全部使用索引  mysql自动评估（索引字段数是否小于常规查询）
+show index from t_user;
+desc t_user;
+explain select * from t_user a where a.name='花木兰' or a.major='土木工程' or a.gender='女'; #no 每个字段需要有自己单独的索引
+explain select * from t_user a where a.phone='12345678907' or a.major='土木工程' or a.email='004@qq.com'; #yes
+explain select * from t_user a where a.name='花木兰'and a.phone='12345678907' or a.major='土木工程' or a.email='004@qq.com'; #yes
+drop index idx_phone on t_user;
+explain select * from t_user a where a.phone='12345678907' or a.major='土木工程' or a.email='004@qq.com'; #no
+
+create index idx_phone on t_user(phone);
+explain select * from t_user a where a.phone>'12345678901'; #no
+explain select * from t_user a where a.phone>'12345678905'; #yes
+
+#user index,ignore index,force index
+show index from t_user;
+create index idx_name on t_user(name);
+explain select * from t_user where name='芈月';
+explain select * from t_user use index(idx_name) where name='芈月';
+explain select * from t_user use index(idx_name_major_gender) where name='芈月';
+explain select * from t_user ignore index(idx_name) where name='芈月';
+explain select * from t_user force index(idx_name_major_gender) where name='芈月';
+
+#覆盖索引 加快查找速度
+show index from t_user;
+drop index idx_major on t_user;
+drop index idx_name on t_user;
+
+explain select * from t_user;
+explain select name from t_user where name='芈月'; #Using index
+explain select id from t_user where id='3'; #Using where
+explain select major,gender from t_user where major='软件工程'; #Using where:Using where; Using index
+show profiles;
+explain select major,create_date from t_user where major='软件工程'; #Using where
+#尽量不使用select * 对 待查询字段建立联合索引 提升查询速度 避免回表查询 直接覆盖索引
+show profile all for query 35;
+
+#前缀索引  体现在subpart字段
+select * from t_user;
+select count( distinct substring(email,1,2))/count(email)from t_user;
+create index idx_eamil_1_2 on t_user(email(2));
+show index from t_user;
+drop index idx_unique_email on t_user;
+explain select * from t_user where email='008@qq.com';
+
+#单列索引与联合索引
+drop index idx_name_major_gender on t_user;
+create index idx_name on t_user(name);
+explain select name,phone from t_user where name='貂蝉' and phone='12345678907'; # 两个单列索引只用到了一个
+create index idx_name_phone on t_user(name,phone);
+explain select name,phone from t_user use index(idx_name_phone) where name='貂蝉' and phone='12345678907'; #指定联合索引 覆盖索引 避免回表查询
+
+ show databases ;
+use sql优化;
+show tables ;
+show index from tb_user;
+select * from tb_user;
+
+use 索引练习;
+select *
+from t_user;
+#insert优化 ：1.批量插入 2.手动提交事务 3.文件load导入
+#主键优化：1.主键字段不要太长 2.尽量使用自增主键 3.主键顺序插入 尽量不要操作主键
+#order by优化：对order by的字段建立索引（注意asc和desc） 避免 filesort 使用using index速度更快，
+show index from t_user;
+explain select name,phone from t_user order by name; #key:idx_name_phone
+explain select email,major from t_user order by email,major; #Using filesort
+create index idx_emial_major on t_user(email,major);
+explain select email,major from t_user order by email,major; #Using index
+explain select major,email from t_user order by email,major;# Using index; Using filesort 最左原则：索引失效
+explain select email,major from t_user order by email asc,major desc ;#Using index; Using filesort 索引失效
+create index idx_email_asc_major_desc on t_user(email asc,major desc );
+explain select email,major from t_user order by email asc,major desc ;#Using index 索引有效
+select @@sort_buffer_size; #262144
+
+# group by 优化 同样是使用索引加快分组效率
+desc select major,count(*) from t_user group by major; #Using temporary
+show index from t_user;
+drop index idx_emial_major on t_user;
+drop index idx_email_asc_major_desc on t_user;
+create index idx_major on t_user(major);
+desc select major,count(*) from t_user group by major; #Using index
+drop index idx_major on t_user;
+create index idx_name_major on t_user(name,major);
+desc select major,count(*) from t_user group by major; #索引失效 Using index; Using temporary
+desc select major,count(*) from t_user where t_user.name='花木兰' group by major; #索引有效 where 和group by组合使用也满足索引最左原则
+
+#limit优化 limit不能通过索引来优化 通过查询主键作为一个新表进行多表查询即可
+use sql优化;
+select * from tb_user limit 999910,10; #366 ms
+select id from tb_user limit 999990,10;
+select * from tb_user a,(select id from tb_user limit 999990,10) b where a.id=b.id; #169 ms
+
+#count优化
+#性能：count(主键）~count(字段名）< count（1）< count(*)
+
+#update优化
+#行锁，表锁 对建立索引的字段进行更新（行锁)，未建立索引字段（表锁） 尽量对建立索引的字段进行更新，避免升级为表锁
+# update 字段名(这个字段建立索引) where 字段名条件
+                                                                                    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
