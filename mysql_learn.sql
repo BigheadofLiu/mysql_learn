@@ -696,7 +696,112 @@ select * from tb_user a,(select id from tb_user limit 999990,10) b where a.id=b.
 #update优化
 #行锁，表锁 对建立索引的字段进行更新（行锁)，未建立索引字段（表锁） 尽量对建立索引的字段进行更新，避免升级为表锁
 # update 字段名(这个字段建立索引) where 字段名条件
-                                                                                    
+
+#视图
+use itheima;
+select * from t_user;
+create view t_user_view_1 as select name,age from t_user;
+show create view t_user_view_1;
+select * from t_user_view_1;
+create or replace view  t_user_view_1 as select name,age,score from t_user;
+alter view t_user_view_1 as select name,age,score,sex from t_user;
+drop view if exists t_user_view_1;
+
+#约束条件 with (local/cascaded) check option
+select * from t_user;
+create or replace  view t_user_v as select id,name from t_user where id>=6 with local check option ;
+select * from t_user_v;
+#不加限制 任何数据都可以插入
+insert into t_user_v values (5,'主=6');
+insert into t_user_v values (6,'溜溜梅');
+
+#加入local限制
+create or replace  view t_user_v_2 as select id,name from t_user_v where id<=10 with local check option ;
+select  * from t_user_v_2;
+insert into t_user_v_2 values (5,'顶针珍珠'); #插入成功 但仍需满足上级视图的限制 能通过此视图插入原表 但是在此视图中不显示
+insert into t_user_v_2 values (11,'肖战'); #插入失败
+#cascade
+create or replace view t_user_v_3 as select id,name from t_user_v where id<=10 with cascaded check option ;
+select * from t_user_v_3;
+insert into t_user_v_3 values (8,'芙蓉王源'); #插入成功
+insert into t_user_v_3 values (5,'芙蓉王源'); #插入失败 满足t_user_v_3的where条件 不满足t_user_v的where条件
+insert into t_user_v_3 values (11,'基尼太美'); #插入失败
+#cascade和local的区别：
+#local只检查目前视图的where条件不检查上级视图的where条件（如果上级加了check仍需满足，不加check则无需满足）
+#cascade 无论上级试图where条件是否加了check都需要满足
+
+#视图的更新（视图的行与基础表之间需要存在一对一的关系才可以完成更新）
+#对于创建时带有 count sum max、group by、distinct、union（all）等不允许更新
+create or replace view t_user_v_4 as select count(name) from t_user;
+insert into t_user_v_4 values (1);  #插入失败：不存在一对一的关系
+
+#视图的作用：1.简单 2.安全 3.数据独立
+create view t_user_v_5 as select age from t_user where t_user.age>18; #可以用视图代替查询语句（比如多表联合查询）
+#通过视图只能查询到满足视图条件的行
+#屏蔽真实表结构带来的变化
+#视图案例
+create view t_user_v_name_age as select name,age from t_user;
+select s.name student_name ,c.name course_name from t_student s,t_course c, studet_course sc where s.id=sc.student_id && c.id=sc.course_id;
+create or replace view t_v_student_course as select s.name student_name ,c.name course_name from t_student s,t_course c, studet_course sc where s.id=sc.student_id && c.id=sc.course_id;
+select * from t_v_student_course;
+
+#存储过程
+#若干条sql语句的集合
+#创建存储过程
+show databases;
+select database();
+create procedure p1()
+begin
+    select * from t_user;
+end;
+call p1();
+#删除
+drop procedure p1;
+#如果是在命令框中写存储过程 需要把命令结束符;替换为其他符号
+# mysql> delimiter $$
+# mysql> create procedure p1()
+#     -> begin
+#     -> select * from t_user;
+#     -> end$$
+# Query OK, 0 rows affected (0.18 sec)
+show create procedure p1; #查看存储过程创建语句
+SELECT * FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA = 'itheima'; #查询指定数据库的存储过程
+
+#系统变量
+#查看系统变量                                                                      #
+show global variables ;
+show session variables ;
+show global variables like 'auto%';
+show session variables like 'auto%';
+select  @@global.autocommit;
+select @@session.autocommit;
+#修改系统变量
+set session autocommit =0;
+#mysql 服务重启后 所有设置的系统变量会恢复默认设置 如果需要制定需要在my.cnf文件中设置参数
+
+#自定义变量
+set @my_color :='blue';
+set @my_age=10;
+set @my_grade=6,@name='瑞克五代';
+#查看
+select @my_color;
+select @my_age,@my_grade,@name;
+select count(*) into @my_count from t_user;
+select  @my_count;
+select  @my_no_define; #未定义赋值的变量初始值为null
+
+#局部变量
+#用于在存储过程中使用的变量
+#语法：declare 变量名 变量类型 [default..]
+use itheima;
+create procedure p2()
+begin
+    declare my_local_count int default 0;
+    select  count(*) into  my_local_count from t_user;
+    select my_local_count;
+end;
+call  p2();
+
 
 
 
