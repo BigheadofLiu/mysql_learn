@@ -802,6 +802,377 @@ begin
 end;
 call  p2();
 
+#if判断
+create procedure p3()
+begin
+    declare score int default 60;
+    declare leveal char;
+    if score>85 then
+        set leveal:='A';
+    elseif score>60 then
+        set leveal:='B';
+    else
+        set leveal='C';
+    end if;
+    select leveal;
+end;
+call p3();
+
+#参数（in,out,inout）
+create procedure p4(in score int,out level char)
+begin
+    if score>=85 then
+        set level:='A';
+    elseif score>=60 then
+        set level:='B';
+    else
+        set level:='C';
+    end if;
+end;
+call p4(88,@level);
+#为什么需要select才刷新level的值
+select @level;
+
+create procedure p5(inout score double)
+begin
+    set score:=score*0.5;
+end;
+set @my_score:=198;
+call p5(@my_score);
+select @my_score;
+
+#case
+create procedure p6(in month int)
+begin
+   declare result varchar(10);
+    case
+        when month between 1 and 3 then
+            set result='一季度';
+        when month between 4 and 6 then
+            set result='二季度';
+        when month between 7 and 9 then
+            set result='三季度';
+        when month between  10 and 12 then
+            set result='四季度';
+        else
+            set result='无效数据';
+    end case ;
+   select concat(month,'月份属于',result);
+end;
+call p6(16);
+
+#循环while
+#计算从1到n的值
+create procedure p7(in sum int)
+begin
+    declare total int default 0;
+    while sum>0 do
+        set total:=total+sum;
+        set sum:=sum-1;
+    end while;
+    select total;
+end;
+call p7(100);
+
+#repeat
+create procedure p8(in sum int)
+begin
+    declare total int default 0;
+    repeat
+        set total:=total+sum;
+        set  sum:=sum-1;
+    until sum<=0
+    end repeat;
+    select total;
+end;
+call p8(100);
+
+#loop(leave,iterate)
+create procedure p9(in sum int)
+begin
+    declare total int default 0;
+    sum:loop
+        if sum<=0 then
+            leave sum;
+        end if;
+        if sum%2=1 then
+            set sum=sum-1;
+            iterate sum;   #如果是奇数跳过
+        end if;
+        set total=total+sum;
+        set sum=sum-1;
+    end loop;
+    select total;
+end;
+call p9(100);
+
+#cursor 相当于一个容器 用于存储查询数据到的多行数据
+create procedure p10()
+begin
+    declare t_data int default 0;
+    select count(*) into t_data from t_user;  #success
+    select * into t_data from t_user; #the used SELECT statements have a different number of columns 不能使用一个普通变量接收
+    select t_data;
+end;
+call p10();
+#所以引入cousor
+select name,score from t_user where age<22;
+create procedure p11()
+begin
+    declare d_name varchar(20) default null;
+    declare d_score tinyint default 0;
+    declare t_data_c cursor for select name,score from t_user where age<22;
+#     declare exit handler for 02000 close t_data_c;
+    declare exit handler for not found close t_data_c;
+    drop table if exists t_user_name_score;
+    create table if not exists t_user_name_score(
+        name varchar(20),
+        score tinyint
+    );
+    open t_data_c;
+    #没有设置跳出循环的条件 #条件处理程序 跳出循环
+    while true do
+    fetch t_data_c into d_name,d_score;
+    insert into t_user_name_score values (d_name,d_score);
+    end while;
+    close t_data_c;
+#     select * from t_user_name_score;
+end;
+call p11();
+
+#存储函数
+#所有的存储函数都可以被存储过程替代
+create  function fun1(sum int)
+returns int deterministic
+begin
+    declare total int default 0;
+    while sum>0 do
+        set total:=total+sum;
+        set sum:=sum-1;
+    end while;
+    return total;
+end;
+select fun1(50);
+
+#触发器
+#目前只支持行级触发 不支持语句级触发
+#类型：insert(new)、update(old\new)、delete(old)
+create table t_niuma_logs(
+  id int(11) not null auto_increment,
+  operation varchar(20) not null comment '操作类型, insert/update/delete',
+  operate_time datetime not null comment '操作时间',
+  operate_id int(11) not null comment '操作的ID',
+  operate_params varchar(500) comment '操作参数',
+  primary key(`id`)
+)engine=innodb default charset=utf8;
+
+#创建触发器
+    create  trigger t_niuma_trigger_insert before insert on t_niuma for each row
+    begin
+        insert into t_niuma_logs values (null,'insert',now(),NEW.id,concat('插入的内容为：id=',new.id,'|name=',new.name,'|grade=',new.grade,'|age=',new.age,'|addr=',new.addr,'|in_work=',new.in_work,'|gender',new.gender));
+    end;
+
+    create  trigger t_niuma_trigger_update before update on t_niuma for each row
+    begin
+        insert into t_niuma_logs values (null,'update',now(),NEW.id,concat('更新后内容为：id=',new.id,'|name=',new.name,'|grade=',new.grade,'|age=',new.age,'|addr=',new.addr,'|in_work=',new.in_work,'|gender',new.gender));
+        insert into t_niuma_logs values (null,'update',now(),OLD.id,concat('更新前内容为：id=',old.id,'|name=',old.name,'|grade=',old.grade,'|age=',old.age,'|addr=',old.addr,'|in_work=',old.in_work,'|gender',old.gender));
+    end;
+
+    create trigger t_niuma_trigger_delete before delete on t_niuma for each row
+    begin
+        insert into t_niuma_logs values (null,'delete',now(),OLD.id,concat('删除的内容为：id=',old.id,'|name=',old.name,'|grade=',old.grade,'|age=',old.age,'|addr=',old.addr,'|in_work=',old.in_work,'|gender',old.gender));
+    end;
+#查看触发器
+    show triggers;
+#删除触发器
+drop trigger t_niuma_trigger_insert;
+drop trigger t_niuma_trigger_update;
+#测试三种触发器
+insert into t_niuma values ('0010011','大桥未久',9,22,'北京','2022-04-07','女');
+update t_niuma set name='神木丽' where id='0010010';
+delete from t_niuma where id='0010010';
+
+#锁
+#全局锁(所有表）、表锁（单个表）、行锁
+#创建全局锁
+flush tables with read lock ;
+show databases ;
+select * from t_niuma; #DQL语句可以执行
+update t_niuma set name='神木丽' where id='0010010'; #执行失败
+unlock tables ; #解除全局锁
+# 执行备份(外部命令框执行)
+# 备份时加上参数 –single-transaction 参数来完成不加锁的一致性数据备份。
+#mysqldump --single-transaction -uroot -p123456 itcast > itcast.sql
+
+# 表锁（表锁、元数据锁、意向锁）
+#
+# 表锁（共享读、独占写）
+# 读锁不会阻塞其他客户端的读，但是会阻塞写。写锁既会阻塞其他客户端的读，又会阻塞其他客户端的写.
+#读锁#(共享）
+lock tables t_niuma read ;
+select * from t_niuma; #可读
+update t_niuma set name='本庄铃' where id='0010010'; #写失败
+unlock tables ;
+#写锁(独占）其他控制台任务只能等待
+lock tables t_niuma write ;
+select * from t_niuma; #可读
+update t_niuma set name='桃乃木' where id='0010010'; #可写
+
+#元数据锁 MDL
+#MDL加锁由系统自动控制，访问同一张表会自动加上不同类型的元数据锁
+#sql语句                                         锁类型                                 说明
+# lock tables xxx read /write	                SHARED_READ_ONLY/SHARED_NO_READ_WRITE
+# select 、 select … lock in share mode	        SHARED_READ	                          与SHARED_READ、SHARED_WRITE兼容，与EXCLUSIVE互斥
+# insert 、update、delete、select …for update	SHARED_WRITE	                      与SHARED_READ、SHARED_WRITE兼容，与EXCLUSIVE互斥
+# alter table …                              	EXCLYSIVE	                          与其他的MDL都互斥
+# 查看自动生成的元数据锁
+# select object_type,object_schema,object_name,lock_type,lock_duration from performance_schema.metadata_locks;
+lock tables t_niuma read ;
+lock tables t_niuma write;
+unlock tables;
+select object_type,object_schema,object_name,lock_type,lock_duration from performance_schema.metadata_locks;
+
+select database();
+set @@session.autocommit:=0;
+select @@session.autocommit;
+begin;
+select * from t_niuma;  #TABLE,itheima,t_niuma,SHARED_READ,TRANSACTION
+commit ;  #commit之后 share_read自动删除
+
+begin;
+insert into t_niuma values (0010012,'小岛南',8,19,'上海','2020-05-04','男'); #TABLE,itheima,t_niuma,SHARED_WRITE,TRANSACTION
+commit;
+
+begin;
+alter table t_niuma add salary tinyint;   #为神马没有看到EXCLYSIVE状态
+# alter table t_niuma drop salary;
+commit;
+select object_type,object_schema,object_name,lock_type,lock_duration from performance_schema.metadata_locks;
+
+#意向锁
+#用来解决表锁与行锁之间的冲突(减少表锁的检查次数，提升性能）
+#意向共享锁 表级锁（IS） select ... lock in share mode
+#意向互斥锁 表级锁（IX） insert、update、delete、select... for update
+#共享锁 行级锁
+#互斥锁 行级锁
+#IS 和 IX是表级别锁、不会和行级别的S锁和X锁发生冲突、意向锁之间也不会发生冲突、会和共享表锁（lock table read）和、独占表锁(lock table lock)发生冲突
+# 兼容关系
+#     S       X      IS     IX
+# S  兼容
+# X 不兼容   不兼容
+# IS 兼容    不兼容  兼容
+# IX 兼容    不兼容  兼容    兼容
+
+select @@autocommit;
+set @@session.autocommit=0;
+select version();
+
+begin;
+select  * from t_niuma where id='0010011' lock in share mode ;
+commit ;
+unlock tables ;
+show index from t_niuma;
+show create table t_niuma;
+
+begin;
+select  name,gender,in_work from t_niuma where id='0010011' for update ;
+commit;
+
+#查看行锁与表锁的相关信息
+#1
+SELECT
+    engine_transaction_id AS trx_id,  -- 事务ID
+    object_name AS table_name,        -- 表名
+    index_name,                       -- 索引名（行锁涉及）
+    lock_type,                        -- 锁类型（RECORD=行锁，TABLE=表锁）
+    lock_mode,                        -- 锁模式（X,IX,S,IS等）
+    lock_status,                      -- 锁状态（GRANTED=已获取，WAITING=等待）
+    lock_data                         -- 锁定的数据（如主键值）
+FROM performance_schema.data_locks;
+#2
+SELECT
+  object_schema,
+  object_name,
+  index_name,
+  lock_type,
+  lock_mode,
+  lock_data
+FROM performance_schema.data_locks;
+#3
+# select object_schema,object_name,index_name,lock_type,lock_mode,lock_data
+# from peformance_schema.data_locks
+
+#相关语句及其对应锁的类型
+# SQL	                        行锁类型	    表意向锁（自动附加）          说明
+# insert，update，delete …	    排他锁（X）	IX                          自动加锁
+# select	                    不加任何锁   无
+# select … lock in share mode	共享锁（S）	IS                          需要手动select之后加上lock in share mode
+# select … for update	        排他锁（X）	IX                          需要手动在select之后for update
+
+alter table t_niuma modify id varchar(10) primary key;  #增加主键
+
+# 针对唯一索引进行检索时，对已存在的记录进行等值匹配时，将会自动优化为行锁。
+# InnoDB的行锁是针对于索引加的锁，不通过索引条件检索数据，那么InnoDB将对表中的所有记录加锁，此时 就会升级为表锁。
+
+
+
+#间隙锁1
+# (1)索引上的等值查询(唯一索引)，给不存在的记录加锁时,优化为间隙锁 。
+# (2)索引上的等值查询(普通索引)，向右遍历时最后一个值不满足查询需求时，next-keylock退化为间隙锁。
+# (3)索引上的范围查询(唯一索引)–会访问到不满足条件的第一个值为止。
+
+#存在于可重复读级别
+begin ;
+commit ;
+insert into t_niuma values ('0010018','波多野',8,18,'上海','2020-05-04','女',1500);
+alter table t_niuma modify salary int;
+
+# (1)
+begin;
+update t_niuma set name='天使萌' where id='0010015' for share ;  #更新不存在的字段
+commit ;
+# 锁情况 GAP间隙锁
+# itheima,t_niuma,TABLE,IX,
+# itheima,t_niuma,PRIMARY,RECORD,"X,GAP",'0010018'
+# 间隙锁会导致其他事务的插入语句阻塞 直到间隙锁取消
+
+# (2)
+begin ;
+select * from t_niuma where age=20 lock in share mode ;
+commit ;
+#锁情况
+# itheima,t_niuma,,TABLE,IS,
+# itheima,t_niuma,idx_age,RECORD,"S,GAP","22, '0010011'"
+# itheima,t_niuma,idx_age,RECORD,S,"20, '0010001'"
+# itheima,t_niuma,PRIMARY,RECORD,"S,REC_NOT_GAP",'0010001'
+
+# (3)
+begin ;
+select * from t_niuma where id>='0010016' for share ;
+# 锁情况
+# itheima,t_niuma,,TABLE,IS,     #表级意向锁
+# itheima,t_niuma,PRIMARY,RECORD,S,supremum pseudo-record    #无穷大锁
+# itheima,t_niuma,PRIMARY,RECORD,S,'0010018'      #间隙锁
+# itheima,t_niuma,PRIMARY,RECORD,"S,REC_NOT_GAP",'0010016'  #行锁
+
+#innodb引擎
+#看不懂 看了视频 略
+
+#常用管理命令
+# mysql +选项 +参数
+# mysqladmin
+# mysqlbinlog
+# mysqlshow
+# mysqldump
+# mysqlimport/source  mysqlimport用于导入 dump -T备份的数据，source用于导入.sql文件
+
+#运维篇暂时不看了。。。
+
+
+
+
+
+
 
 
 
